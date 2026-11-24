@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+
+# Keystores
+*.jks
+*.keystore
+!gradle/wrapper/gradle-wrapper.jar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs kept on purpose in app-debug.apk at the repo root are not ignored
