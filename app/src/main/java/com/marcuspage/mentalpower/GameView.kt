@@ -831,6 +831,6 @@ class GameView(context: Context) : View(context) {
     }
 
     companion object {
-        const val BUILD_STAMP = "Mental Power v1.0.0"
+        const val BUILD_STAMP = "Mental Power v1.0.1"
     }
 }

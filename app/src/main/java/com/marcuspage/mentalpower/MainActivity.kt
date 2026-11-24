@@ -14,8 +14,10 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        hideSystemBars()
+        // the content view has to exist before the window will hand out an insets controller,
+        // so the bars are hidden afterwards, not before
         setContentView(GameView(this))
+        hideSystemBars()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -26,11 +28,12 @@ class MainActivity : Activity() {
     private fun hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let { controller ->
-                controller.hide(WindowInsets.Type.systemBars())
-                controller.systemBarsBehavior =
-                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
+            // the controller only exists once the decor view does, which is why this is never
+            // called before setContentView()
+            val controller = window.insetsController ?: return
+            controller.hide(WindowInsets.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         } else {
             @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = (
