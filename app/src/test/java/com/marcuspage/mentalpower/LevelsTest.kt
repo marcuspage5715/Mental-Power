@@ -71,6 +71,27 @@ class LevelsTest {
     }
 
     @Test
+    fun theNewRoomsHandOutExactlyThePiecesTheirSolutionNeeds() {
+        val extra = Levels.LEVELS.filter { it.extra }
+        assertEquals(24, extra.size)
+        for (level in extra) {
+            val area = level.rows.map { row -> row.count { it == '#' } }.sum()
+            val capacity = level.pieces.map { p -> if (p == 0) 4 else 5 }.sum()
+            // no spare pieces: the tray holds exactly what the shape needs
+            assertEquals("room ${level.number} hands out spare pieces", area, capacity)
+            val solution = Solver.solve(level)
+            assertNotNull("room ${level.number} has no solution", solution)
+            assertEquals("room ${level.number}: the solution must use every piece in the tray",
+                level.pieces.size, solution!!.size)
+            val room = Room(level)
+            for (p in solution) {
+                assertTrue("room ${level.number}: placement rejected", room.place(p.piece, p.variant, p.ox, p.oy))
+            }
+            assertTrue("room ${level.number} should be solved", room.isSolved())
+        }
+    }
+
+    @Test
     fun piecesCannotOverlapOrLeaveTheShape() {
         val room = Room(Levels.LEVELS[0]) // 5x3 rectangle, pieces T L Y
         assertTrue(room.place(3, 0, 0, 0))
