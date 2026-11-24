@@ -50,8 +50,9 @@ class GameView(context: Context) : View(context) {
     private var room: Room? = null
     private var roomLevel = 1
     private var solved = false
-    private var startedAt = 0L
-    private var finishedAt = 0L
+
+    /** Rooms whose one hint has already been spent. */
+    private val hintsUsed = HashSet<Int>()
 
     private var activeTray: TrayItem? = null
     private var activeBoard: Placement? = null
@@ -91,7 +92,16 @@ class GameView(context: Context) : View(context) {
 
     init {
         unlocked = prefs.getInt("unlocked", 1).coerceIn(1, Levels.COUNT)
+        prefs.getString("hints", "").orEmpty().split(',').forEach { saved ->
+            saved.trim().toIntOrNull()?.let { hintsUsed.add(it) }
+        }
     }
+
+    private fun saveHints() {
+        prefs.edit().putString("hints", hintsUsed.joinToString(",")).apply()
+    }
+
+    private fun hintAvailable(level: Int): Boolean = level !in hintsUsed
 
     // ---------------------------------------------------------------- drawing
 
@@ -116,7 +126,7 @@ class GameView(context: Context) : View(context) {
             postInvalidateDelayed(60)
         }
 
-        if (screen == Screen.PLAY && !solved) postInvalidateDelayed(200)
+
     }
 
     private fun text(
@@ -181,12 +191,16 @@ class GameView(context: Context) : View(context) {
     }
 
     private fun drawBanner(c: Canvas) {
-        val w = vw * 0.4f
-        val h = vh * 0.09f
+        val size = min(vh * 0.040f, vw * 0.026f)
+        tp.textSize = size
+        tp.typeface = typeMedium
+        val textW = tp.measureText(banner)
+        val h = size * 2.4f
+        val w = min(vw * 0.94f, textW + size * 3f)
         val r = RectF((vw - w) / 2f, vh * 0.02f, (vw + w) / 2f, vh * 0.02f + h)
-        fillPaint.color = Palette.withAlpha(0xFF4A4741.toInt(), 0.9f)
+        fillPaint.color = Palette.withAlpha(0xFF4A4741.toInt(), 0.92f)
         c.drawRoundRect(r, h / 2f, h / 2f, fillPaint)
-        text(c, banner, r.centerX(), r.centerY(), h * 0.38f, 0xFFFFFFFF.toInt(), true)
+        text(c, banner, r.centerX(), r.centerY(), size, 0xFFFFFFFF.toInt(), true)
     }
 
     // ---------------------------------------------------------------- title
@@ -214,7 +228,8 @@ class GameView(context: Context) : View(context) {
 
         val startAt = if (unlocked > 1) "room $unlocked of ${Levels.COUNT}" else "from the first room"
         text(c, startAt, vw / 2f, y + bh + vh * 0.075f, min(vw * 0.02f, vh * 0.036f), Palette.INK_SOFT, false)
-        text(c, "36 rooms of the original game and 24 new ones",
+        val hintsLeft = Levels.COUNT - hintsUsed.size
+        text(c, "36 rooms of the original game, 24 new ones  ·  $hintsLeft hints left",
             vw / 2f, y + bh + vh * 0.145f, min(vw * 0.018f, vh * 0.032f), Palette.INK_FAINT, false)
 
         tp.textAlign = Paint.Align.LEFT
@@ -327,11 +342,6 @@ class GameView(context: Context) : View(context) {
         // --- hud
         text(c, "ROOM $roomLevel", margin, hudH * 0.52f, hudH * 0.40f, Palette.INK, true, Paint.Align.LEFT)
 
-        val elapsed = if (solved) finishedAt - startedAt else SystemClock.elapsedRealtime() - startedAt
-        val mins = elapsed / 60000
-        val secs = (elapsed / 1000) % 60
-        text(c, String.format("%02d:%02d", mins, secs), vw / 2f, hudH * 0.52f, hudH * 0.46f, Palette.INK_SOFT, true)
-
         val bh = hudH * 0.62f
         val by = (hudH - bh) / 2f
         var bx = vw - margin
@@ -346,6 +356,9 @@ class GameView(context: Context) : View(context) {
         bx -= flipW + vw * 0.008f
         val rotW = bh * 1.9f
         button(c, RectF(bx - rotW, by, bx, by + bh), "ROTATE", "rotate", false)
+        bx -= rotW + vw * 0.008f
+        val hintW = bh * 1.55f
+        button(c, RectF(bx - hintW, by, bx, by + bh), "HINT", "hint", false, hintAvailable(roomLevel))
 
         // --- board
         val availW = vw - margin * 2f
@@ -455,18 +468,14 @@ class GameView(context: Context) : View(context) {
         fillPaint.color = Palette.PANEL
         c.drawRoundRect(panel, vh * 0.035f, vh * 0.035f, fillPaint)
 
-        text(c, "ROOM $roomLevel CLEARED", panel.centerX(), panel.top + ph * 0.17f, ph * 0.11f, Palette.INK, true)
-
-        val elapsed = finishedAt - startedAt
-        text(c, String.format("time %02d:%02d", elapsed / 60000, (elapsed / 1000) % 60),
-            panel.centerX(), panel.top + ph * 0.31f, ph * 0.07f, Palette.INK_SOFT, false)
+        text(c, "ROOM $roomLevel CLEARED", panel.centerX(), panel.top + ph * 0.20f, ph * 0.11f, Palette.INK, true)
 
         if (roomLevel < Levels.COUNT) {
             val next = Levels.LEVELS[roomLevel]
-            text(c, "PASSWORD FOR ROOM ${roomLevel + 1}", panel.centerX(), panel.top + ph * 0.47f, ph * 0.062f, Palette.INK_SOFT, false)
-            text(c, next.password, panel.centerX(), panel.top + ph * 0.60f, ph * 0.15f, Palette.ACCENT, true)
+            text(c, "PASSWORD FOR ROOM ${roomLevel + 1}", panel.centerX(), panel.top + ph * 0.40f, ph * 0.062f, Palette.INK_SOFT, false)
+            text(c, next.password, panel.centerX(), panel.top + ph * 0.56f, ph * 0.15f, Palette.ACCENT, true)
         } else {
-            text(c, "all thirty-six rooms are done", panel.centerX(), panel.top + ph * 0.50f, ph * 0.075f, Palette.ACCENT, true)
+            text(c, "all sixty rooms are done", panel.centerX(), panel.top + ph * 0.46f, ph * 0.075f, Palette.ACCENT, true)
         }
 
         val bw = pw * 0.26f
@@ -576,9 +585,10 @@ class GameView(context: Context) : View(context) {
         }
 
         when (buttonAt(x, y)) {
+            "hint" -> { useHint(); return }
             "rotate" -> { rotateActive(); return }
             "flip" -> { flipActive(); return }
-            "reset" -> { r.reset(); solved = false; activeTray = null; activeBoard = null; startedAt = SystemClock.elapsedRealtime(); invalidate(); return }
+            "reset" -> { r.reset(); solved = false; activeTray = null; activeBoard = null; invalidate(); return }
             "menu" -> { screen = Screen.TITLE; invalidate(); return }
         }
 
@@ -762,10 +772,36 @@ class GameView(context: Context) : View(context) {
         }
     }
 
+    /**
+     * Puts one piece of a full solution on the board. A room allows this once; the hint is only
+     * spent if a piece could actually be placed.
+     */
+    private fun useHint() {
+        val r = room ?: return
+        if (solved || !hintAvailable(roomLevel)) return
+        val placed = Hint.place(r)
+        if (placed == null) {
+            showBanner("this layout cannot be finished - lift a piece and try again")
+            return
+        }
+        hintsUsed.add(roomLevel)
+        saveHints()
+        activeTray = null
+        activeBoard = placed
+        click()
+        afterPlace(r)
+        invalidate()
+    }
+
+    private fun showBanner(message: String) {
+        banner = message
+        bannerUntil = SystemClock.elapsedRealtime() + 2800
+        invalidate()
+    }
+
     private fun afterPlace(r: Room) {
         if (r.isSolved() && !solved) {
             solved = true
-            finishedAt = SystemClock.elapsedRealtime()
             if (roomLevel < Levels.COUNT && unlocked < roomLevel + 1) {
                 unlocked = roomLevel + 1
                 prefs.edit().putInt("unlocked", unlocked).apply()
@@ -780,8 +816,6 @@ class GameView(context: Context) : View(context) {
         activeTray = null
         activeBoard = null
         drag = null
-        startedAt = SystemClock.elapsedRealtime()
-        finishedAt = 0L
         screen = Screen.PLAY
         invalidate()
     }
@@ -847,7 +881,6 @@ class GameView(context: Context) : View(context) {
     /** Shows the room cleared panel. Used by the screenshot test. */
     internal fun debugClear() {
         solved = true
-        finishedAt = startedAt + 95000
         invalidate()
     }
 
@@ -870,6 +903,6 @@ class GameView(context: Context) : View(context) {
     }
 
     companion object {
-        const val BUILD_STAMP = "Mental Power v1.1.0"
+        const val BUILD_STAMP = "Mental Power v1.2.0"
     }
 }

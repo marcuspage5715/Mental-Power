@@ -18,9 +18,13 @@ no storyline. Solving a room takes you straight to the next one.
   rooms give you more pieces than you need, exactly as the Game Boy did.
 * **The original passwords**: KING, EASY, NICE, BORN … STAR, FINE. Type one on the password screen
   to jump straight to that room. The word `ZEAL` unlocks the room select, as it did in 1990.
-* **A timer per room**, running from the moment the room opens.
+* **One hint per room.** If a room has you beaten, HINT puts one correct piece on the board for
+you. Each room allows it once, so there are sixty hints across the game; the title screen shows
+how many you have left. A hint is only spent if a piece could actually be placed, and it never
+leaves a room unwinnable.
 * **Progress that survives closing the app**: the furthest room you have reached.
 * **Colour**: every pentomino has its own soft colour, so a half finished room reads at a glance.
+* **No clock.** Rooms are not timed; nothing is counting at you.
 
 ## How to play
 
@@ -35,6 +39,7 @@ the room.
 | Mirror a piece | **FLIP** in the top bar turns the selected piece over |
 | Turn the selected piece | **ROTATE** in the top bar |
 | Put every piece back | **RESET** |
+| Get one piece placed for you | **HINT** (once per room) |
 | Back to the title screen | **MENU**, or the system back button |
 | Leave the app | **EXIT** on the title screen, or back again from there |
 
