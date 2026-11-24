@@ -106,6 +106,37 @@ class InteractionTest {
     }
 
     @Test
+    fun aWholeRoomCanBeClearedByDraggingPieces() {
+        val v = view()
+        val room = v.debugRoom()!!
+        val solution = Solver.solve(Levels.LEVELS[0])!!
+
+        for (step in solution) {
+            // draw so the tray layout matches the pieces still in it
+            v.draw(Canvas(Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)))
+            val geo = v.debugGeometry()
+            val index = room.tray.indexOfFirst { it.piece == step.piece }
+            assertTrue("piece ${step.piece} should still be in the tray", index >= 0)
+            room.tray[index].variant = step.variant
+
+            val rect = geo.trayRects[index]
+            val grabX = rect.left + 2f
+            val grabY = rect.top + 2f
+            val dropX = geo.boardX + step.ox * geo.cell + 2f
+            val dropY = geo.boardY + step.oy * geo.cell + 2f
+            touch(v, MotionEvent.ACTION_DOWN, grabX, grabY)
+            touch(v, MotionEvent.ACTION_MOVE, dropX, dropY)
+            touch(v, MotionEvent.ACTION_UP, dropX, dropY)
+        }
+
+        assertTrue("the room should be solved", room.isSolved())
+        assertEquals(solution.size, room.placed.size)
+
+        // the cleared panel is what the player sees next, so it has to draw without a crash
+        v.draw(Canvas(Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)))
+    }
+
+    @Test
     fun aPlacedPieceCanBeLiftedAgain() {
         val v = view()
         val geo = v.debugGeometry()
