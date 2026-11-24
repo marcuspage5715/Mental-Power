@@ -10,9 +10,10 @@ no storyline. Solving a room takes you straight to the next one.
 
 ## What is in the box
 
-* **36 rooms**, in the original order, with the original shapes: the plain rectangles of the first
-  few rooms, then the odd shapes — the rocket, the pistol, the enlarged pentominoes — and the
-  8x8 square for room 36.
+* **60 rooms.** Rooms 1-36 are the original game, in order, with the original shapes: the plain
+  rectangles of the first few rooms, then the odd shapes — the rocket, the pistol, the enlarged
+  pentominoes — and the 8x8 square for room 36. Rooms 37-60 are **24 new puzzles** made for this
+  app, each one a shape that the pieces it hands out are known to fill.
 * **The authentic piece sets.** A room hands you the pieces the original game handed you, and some
   rooms give you more pieces than you need, exactly as the Game Boy did.
 * **The original passwords**: KING, EASY, NICE, BORN … STAR, FINE. Type one on the password screen
@@ -34,7 +35,8 @@ the room.
 | Mirror a piece | **FLIP** in the top bar turns the selected piece over |
 | Turn the selected piece | **ROTATE** in the top bar |
 | Put every piece back | **RESET** |
-| Back to the title screen | **MENU** |
+| Back to the title screen | **MENU**, or the system back button |
+| Leave the app | **EXIT** on the title screen, or back again from there |
 
 Tapping a piece on the board turns it in place; if it no longer fits where it is, it stays put and
 you can drag it off instead.
@@ -61,9 +63,20 @@ adb install -r app-debug.apk
 It is a debug build signed with the standard debug key, which is fine for sideloading on your own
 device and is not accepted by Google Play.
 
+## The new rooms
+
+The 24 rooms after the original game are generated: a shape is grown symmetrically on a grid so it
+reads as a designed silhouette rather than a blob, and it is kept only if a solver can tile it
+exactly with a subset of the twelve pentominoes. Each new room hands you exactly the pieces its
+solution needs — no spares — which makes them harder than the early rooms of the original game.
+Their passwords are ordinary four letter words too (BOLD, CALM, DUSK ... BEAM, DRUM).
+
+`LevelsTest` solves all sixty rooms through the same `Room` class the game plays with, so a new
+room that cannot be filled would fail the build.
+
 ## Where the rooms come from
 
-The room shapes and the piece set of every room were taken from the level data of
+The shapes and piece sets of rooms 1-36 were taken from the level data of
 [Puzzle Land](https://github.com/joyrider3774/puzzleland_embedded), a faithful C remake of the
 original game, and cross-checked against the room dimensions listed in
 [DEngel's walkthrough](https://gamefaqs.gamespot.com/gameboy/585678-daedalian-opus/faqs/44072) and

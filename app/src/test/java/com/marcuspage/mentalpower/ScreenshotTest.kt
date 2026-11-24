@@ -56,6 +56,8 @@ class ScreenshotTest {
             shoot("room32", w, h) { it.open(32) }
             shoot("room36", w, h) { it.open(36) }
             shoot("clear", w, h) { it.open(12); it.debugClear() }
+            shoot("room40", w, h) { it.open(40) }
+            shoot("room60", w, h) { it.open(60) }
         }
     }
 }

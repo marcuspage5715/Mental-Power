@@ -11,13 +11,28 @@ import android.view.WindowManager
 /** The one screen of the game. Everything else is drawn by [GameView]. */
 class MainActivity : Activity() {
 
+    private lateinit var game: GameView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         // the content view has to exist before the window will hand out an insets controller,
         // so the bars are hidden afterwards, not before
-        setContentView(GameView(this))
+        game = GameView(this)
+        setContentView(game)
         hideSystemBars()
+    }
+
+    /**
+     * Back steps out of a puzzle, a password entry or the room select; on the title screen it
+     * leaves the app, the same as the EXIT button.
+     */
+    @Deprecated("The platform still routes the back button here for this app.")
+    override fun onBackPressed() {
+        if (!game.handleBack()) {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

@@ -1,5 +1,6 @@
 package com.marcuspage.mentalpower
 
+import android.app.Activity
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -194,12 +195,12 @@ class GameView(context: Context) : View(context) {
         val titleSize = min(vw * 0.085f, vh * 0.17f)
         text(c, "MENTAL", vw / 2f, vh * 0.26f, titleSize, Palette.INK, true)
         text(c, "POWER", vw / 2f, vh * 0.26f + titleSize * 1.02f, titleSize, Palette.ACCENT, true)
-        text(c, "thirty-six pentomino rooms", vw / 2f, vh * 0.62f, min(vw * 0.022f, vh * 0.042f), Palette.INK_SOFT, false)
+        text(c, "sixty pentomino rooms", vw / 2f, vh * 0.62f, min(vw * 0.022f, vh * 0.042f), Palette.INK_SOFT, false)
 
-        val bw = min(vw * 0.20f, vh * 0.42f)
+        val bw = min(vw * 0.185f, vh * 0.40f)
         val bh = vh * 0.115f
-        val gap = vw * 0.025f
-        val total = bw * 3 + gap * 2
+        val gap = vw * 0.018f
+        val total = bw * 4 + gap * 3
         var x = (vw - total) / 2f
         val y = vh * 0.72f
 
@@ -208,9 +209,13 @@ class GameView(context: Context) : View(context) {
         button(c, RectF(x, y, x + bw, y + bh), "ROOMS", "rooms", false)
         x += bw + gap
         button(c, RectF(x, y, x + bw, y + bh), "PASSWORD", "password", false)
+        x += bw + gap
+        button(c, RectF(x, y, x + bw, y + bh), "EXIT", "exit", false)
 
         val startAt = if (unlocked > 1) "room $unlocked of ${Levels.COUNT}" else "from the first room"
         text(c, startAt, vw / 2f, y + bh + vh * 0.075f, min(vw * 0.02f, vh * 0.036f), Palette.INK_SOFT, false)
+        text(c, "36 rooms of the original game and 24 new ones",
+            vw / 2f, y + bh + vh * 0.145f, min(vw * 0.018f, vh * 0.032f), Palette.INK_FAINT, false)
 
         tp.textAlign = Paint.Align.LEFT
         tp.color = Palette.INK_FAINT
@@ -274,10 +279,10 @@ class GameView(context: Context) : View(context) {
     private fun drawRooms(c: Canvas) {
         text(c, "ROOMS", vw / 2f, vh * 0.14f, min(vw * 0.04f, vh * 0.09f), Palette.INK, true)
 
-        val cols = 6
+        val cols = 10
         val rows = 6
-        val areaW = vw * 0.62f
-        val areaH = vh * 0.60f
+        val areaW = vw * 0.74f
+        val areaH = vh * 0.56f
         val cw = areaW / cols
         val ch = areaH / rows
         val left = (vw - areaW) / 2f
@@ -292,6 +297,10 @@ class GameView(context: Context) : View(context) {
             )
             val open = n <= unlocked
             if (open) {
+                if (n > Levels.ORIGINAL_COUNT) {
+                    fillPaint.color = Palette.withAlpha(Palette.ACCENT_SOFT, 0.55f)
+                    c.drawRoundRect(r, ch * 0.2f, ch * 0.2f, fillPaint)
+                }
                 button(c, r, n.toString(), "room:$n", n == unlocked && unlocked > 1)
             } else {
                 fillPaint.color = Palette.BG_DEEP
@@ -301,6 +310,8 @@ class GameView(context: Context) : View(context) {
         }
 
         button(c, RectF(vw * 0.02f, vh * 0.06f, vw * 0.02f + vw * 0.12f, vh * 0.06f + vh * 0.085f), "BACK", "back", false)
+        text(c, "1-36 the original game   37-60 new", vw / 2f, vh * 0.94f,
+            min(vw * 0.016f, vh * 0.028f), Palette.INK_FAINT, false)
     }
 
     // ---------------------------------------------------------------- the room
@@ -504,6 +515,7 @@ class GameView(context: Context) : View(context) {
                 "play" -> openRoom(unlocked)
                 "rooms" -> { screen = Screen.ROOMS; invalidate() }
                 "password" -> { password.setLength(0); passwordError = false; screen = Screen.PASSWORD; invalidate() }
+                "exit" -> leaveApp()
             }
 
             Screen.PASSWORD -> onPasswordKey(buttonAt(x, y))
@@ -774,6 +786,33 @@ class GameView(context: Context) : View(context) {
         invalidate()
     }
 
+    /**
+     * The system back gesture. Returns false when there is nowhere left to go, which lets the
+     * activity close.
+     */
+    internal fun handleBack(): Boolean {
+        return when (screen) {
+            Screen.TITLE -> false
+            Screen.PLAY -> {
+                drag = null
+                screen = Screen.TITLE
+                invalidate()
+                true
+            }
+            Screen.PASSWORD, Screen.ROOMS -> {
+                screen = Screen.TITLE
+                invalidate()
+                true
+            }
+        }
+    }
+
+    /** The EXIT button: closes the activity, which is the whole app. */
+    private fun leaveApp() {
+        drag = null
+        (context as? Activity)?.finish()
+    }
+
     // ---------------------------------------------------------------- test hooks
 
     /** Opens the room select with every room available. Used by the screenshot test. */
@@ -831,6 +870,6 @@ class GameView(context: Context) : View(context) {
     }
 
     companion object {
-        const val BUILD_STAMP = "Mental Power v1.0.1"
+        const val BUILD_STAMP = "Mental Power v1.1.0"
     }
 }

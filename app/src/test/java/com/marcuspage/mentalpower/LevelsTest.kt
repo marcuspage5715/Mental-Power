@@ -12,11 +12,13 @@ import org.junit.Test
 class LevelsTest {
 
     @Test
-    fun thereAreThirtySixRooms() {
-        assertEquals(36, Levels.LEVELS.size)
-        assertEquals(36, Levels.COUNT)
+    fun thereAreSixtyRooms() {
+        assertEquals(60, Levels.LEVELS.size)
+        assertEquals(60, Levels.COUNT)
+        assertEquals(36, Levels.ORIGINAL_COUNT)
         Levels.LEVELS.forEachIndexed { i, level ->
             assertEquals(i + 1, level.number)
+            assertEquals("room ${level.number}", level.number > Levels.ORIGINAL_COUNT, level.extra)
         }
     }
 
@@ -53,7 +55,8 @@ class LevelsTest {
             val area = level.rows.map { row -> row.count { it == '#' } }.sum()
             val capacity = level.pieces.map { p -> if (p == 0) 4 else 5 }.sum()
             assertTrue("room ${level.number}: shape area $area, pieces only cover $capacity", capacity >= area)
-            if (level.number == 36) assertEquals(64, area) else assertEquals("room ${level.number}", 0, area % 5)
+            assertTrue("room ${level.number}: area $area is not a whole number of pieces",
+                area % 5 == 0 || area % 5 == 4)
 
             val solution = Solver.solve(level)
             assertNotNull("room ${level.number} has no solution", solution)
@@ -101,6 +104,8 @@ class LevelsTest {
         assertEquals(23, Levels.PASSWORD_TO_LEVEL["WILD"])
         assertEquals(36, Levels.PASSWORD_TO_LEVEL["FINE"])
         assertEquals("ZEAL", Levels.UNLOCK_ALL_PASSWORD)
-        assertEquals(35, Levels.PASSWORD_TO_LEVEL.size) // room 1 has no password
+        assertEquals(59, Levels.PASSWORD_TO_LEVEL.size) // room 1 has no password
+        assertEquals(37, Levels.PASSWORD_TO_LEVEL["BOLD"])
+        assertEquals(60, Levels.PASSWORD_TO_LEVEL["DRUM"])
     }
 }
