@@ -54,6 +54,12 @@ class GameView(context: Context) : View(context) {
     /** Rooms whose one hint has already been spent. */
     private val hintsUsed = HashSet<Int>()
 
+    /** Board states to go back to, oldest first. */
+    private val history = ArrayList<RoomSnapshot>()
+
+    /** The board as it was when the current gesture started, if one is under way. */
+    private var gestureStart: RoomSnapshot? = null
+
     private var activeTray: TrayItem? = null
     private var activeBoard: Placement? = null
     private var drag: DragState? = null
@@ -345,20 +351,24 @@ class GameView(context: Context) : View(context) {
         val bh = hudH * 0.62f
         val by = (hudH - bh) / 2f
         var bx = vw - margin
-        val menuW = bh * 1.6f
-        button(c, RectF(bx - menuW, by, bx, by + bh), "MENU", "menu", false)
-        bx -= menuW + vw * 0.008f
-        val resetW = bh * 1.7f
-        button(c, RectF(bx - resetW, by, bx, by + bh), "RESET", "reset", false)
-        bx -= resetW + vw * 0.008f
-        val flipW = bh * 1.5f
-        button(c, RectF(bx - flipW, by, bx, by + bh), "FLIP", "flip", false)
-        bx -= flipW + vw * 0.008f
-        val rotW = bh * 1.9f
-        button(c, RectF(bx - rotW, by, bx, by + bh), "ROTATE", "rotate", false)
-        bx -= rotW + vw * 0.008f
-        val hintW = bh * 1.55f
-        button(c, RectF(bx - hintW, by, bx, by + bh), "HINT", "hint", false, hintAvailable(roomLevel))
+        val barButtons = listOf(
+            Triple("MENU", 1.6f, "menu"),
+            Triple("RESET", 1.7f, "reset"),
+            Triple("FLIP", 1.5f, "flip"),
+            Triple("ROTATE", 1.9f, "rotate"),
+            Triple("UNDO", 1.7f, "undo"),
+            Triple("HINT", 1.55f, "hint"),
+        )
+        for ((label, widthFactor, id) in barButtons) {
+            val w = bh * widthFactor
+            val enabled = when (id) {
+                "undo" -> history.isNotEmpty()
+                "hint" -> hintAvailable(roomLevel)
+                else -> true
+            }
+            button(c, RectF(bx - w, by, bx, by + bh), label, id, false, enabled)
+            bx -= w + vw * 0.008f
+        }
 
         // --- board
         val availW = vw - margin * 2f
@@ -410,8 +420,13 @@ class GameView(context: Context) : View(context) {
         }
 
         // --- tray
-        fillPaint.color = Palette.BG_DEEP
+        val overTray = d != null && d.item == null && d.fy > trayTop
+        fillPaint.color = if (overTray) Palette.ACCENT_SOFT else Palette.BG_DEEP
         c.drawRect(0f, trayTop, vw, vh, fillPaint)
+        if (overTray) {
+            text(c, "drop here to put it back", vw / 2f, trayTop - vh * 0.03f,
+                min(vw * 0.018f, vh * 0.03f), Palette.ACCENT, false)
+        }
         layoutTray(r)
         val tcell = trayCellPx.toFloat()
         for (i in r.tray.indices) {
@@ -586,9 +601,18 @@ class GameView(context: Context) : View(context) {
 
         when (buttonAt(x, y)) {
             "hint" -> { useHint(); return }
+            "undo" -> { undo(); return }
             "rotate" -> { rotateActive(); return }
             "flip" -> { flipActive(); return }
-            "reset" -> { r.reset(); solved = false; activeTray = null; activeBoard = null; invalidate(); return }
+            "reset" -> {
+                recordChange(r.snapshot())
+                r.reset()
+                solved = false
+                activeTray = null
+                activeBoard = null
+                invalidate()
+                return
+            }
             "menu" -> { screen = Screen.TITLE; invalidate(); return }
         }
 
@@ -603,6 +627,7 @@ class GameView(context: Context) : View(context) {
             val gy = ((y - rect.top) / tcell).toInt().coerceIn(0, s.y - 1)
             activeTray = item
             activeBoard = null
+            gestureStart = r.snapshot()
             drag = DragState(item, null, gx, gy, x, y, x, y, item.variant, false)
             invalidate()
             return
@@ -615,6 +640,7 @@ class GameView(context: Context) : View(context) {
         if (p != null) {
             val grabX = gx - p.ox
             val grabY = gy - p.oy
+            gestureStart = r.snapshot()
             r.lift(p)
             activeTray = null
             activeBoard = p
@@ -635,10 +661,23 @@ class GameView(context: Context) : View(context) {
         val d = drag ?: return
         drag = null
         val r = room
+        val before = gestureStart
+        gestureStart = null
         if (r == null) { invalidate(); return }
 
         if (!d.moved) {
-            tapPiece(d)
+            val changed = tapPiece(d)
+            if (changed) recordChange(before)
+            invalidate()
+            return
+        }
+
+        // a piece carried off the board and dropped on the tray goes back into it
+        if (y > trayTop && d.item == null) {
+            r.tray.add(TrayItem(d.piece, d.variant))
+            r.sortTray()
+            recordChange(before)
+            click()
             invalidate()
             return
         }
@@ -649,6 +688,9 @@ class GameView(context: Context) : View(context) {
         if (r.canPlace(d.piece, d.variant, ox, oy)) {
             r.place(d.piece, d.variant, ox, oy)
             if (d.item != null) r.tray.remove(d.item)
+            val stayedPut = d.original != null &&
+                d.original.ox == ox && d.original.oy == oy && d.original.variant == d.variant
+            if (!stayedPut) recordChange(before)
             click()
             afterPlace(r)
         } else {
@@ -661,8 +703,8 @@ class GameView(context: Context) : View(context) {
         invalidate()
     }
 
-    private fun tapPiece(d: DragState) {
-        val r = room ?: return
+    private fun tapPiece(d: DragState): Boolean {
+        val r = room ?: return false
         val item = d.item
         if (item != null) {
             // tapping a tray piece turns it a quarter turn
@@ -670,19 +712,20 @@ class GameView(context: Context) : View(context) {
             activeTray = item
             activeBoard = null
             click()
-            return
+            return false
         }
-        val original = d.original ?: return
+        val original = d.original ?: return false
         val variant = Pieces.of(original.piece).rotated(original.variant)
         val placed = tryPlaceNear(r, original.piece, variant, original.ox, original.oy)
         if (placed == null) {
             r.place(original.piece, original.variant, original.ox, original.oy)
             activeBoard = null
-        } else {
-            activeBoard = placed
-            click()
-            afterPlace(r)
+            return false
         }
+        activeBoard = placed
+        click()
+        afterPlace(r)
+        return true
     }
 
     private fun tryPlaceNear(r: Room, piece: Int, variant: Int, ox: Int, oy: Int): Placement? {
@@ -724,20 +767,24 @@ class GameView(context: Context) : View(context) {
             invalidate()
             return
         }
-        val p = activeBoard
-        if (p != null) {
-            r.lift(p)
-            val variant = Pieces.of(p.piece).rotated(p.variant)
-            val moved = tryPlaceNear(r, p.piece, variant, p.ox, p.oy)
-            if (moved == null) {
-                r.place(p.piece, p.variant, p.ox, p.oy)
-                activeBoard = null
-            } else {
-                activeBoard = moved
-                afterPlace(r)
-            }
-            invalidate()
+        val p = activeBoard ?: return
+        turnPlaced(r, p) { Pieces.of(p.piece).rotated(p.variant) }
+    }
+
+    /** Turns a piece that is already on the board, recording it as a move if it moved. */
+    private fun turnPlaced(r: Room, p: Placement, variantOf: () -> Int) {
+        val before = r.snapshot()
+        r.lift(p)
+        val moved = tryPlaceNear(r, p.piece, variantOf(), p.ox, p.oy)
+        if (moved == null) {
+            r.place(p.piece, p.variant, p.ox, p.oy)
+            activeBoard = null
+        } else {
+            activeBoard = moved
+            recordChange(before)
+            afterPlace(r)
         }
+        invalidate()
     }
 
     private fun flipActive() {
@@ -756,20 +803,8 @@ class GameView(context: Context) : View(context) {
             invalidate()
             return
         }
-        val p = activeBoard
-        if (p != null) {
-            r.lift(p)
-            val variant = Pieces.of(p.piece).flipped(p.variant)
-            val moved = tryPlaceNear(r, p.piece, variant, p.ox, p.oy)
-            if (moved == null) {
-                r.place(p.piece, p.variant, p.ox, p.oy)
-                activeBoard = null
-            } else {
-                activeBoard = moved
-                afterPlace(r)
-            }
-            invalidate()
-        }
+        val p = activeBoard ?: return
+        turnPlaced(r, p) { Pieces.of(p.piece).flipped(p.variant) }
     }
 
     /**
@@ -779,6 +814,7 @@ class GameView(context: Context) : View(context) {
     private fun useHint() {
         val r = room ?: return
         if (solved || !hintAvailable(roomLevel)) return
+        val before = r.snapshot()
         val placed = Hint.place(r)
         if (placed == null) {
             showBanner("this layout cannot be finished - lift a piece and try again")
@@ -786,10 +822,32 @@ class GameView(context: Context) : View(context) {
         }
         hintsUsed.add(roomLevel)
         saveHints()
+        recordChange(before)
         activeTray = null
         activeBoard = placed
         click()
         afterPlace(r)
+        invalidate()
+    }
+
+    /** Pushes the state a move started from, so UNDO can go back to it. */
+    private fun recordChange(before: RoomSnapshot?) {
+        if (before == null) return
+        history.add(before)
+        if (history.size > 200) history.removeAt(0)
+    }
+
+    /** Takes back the last move, whatever it was: a piece placed, moved, turned or put back. */
+    private fun undo() {
+        val r = room ?: return
+        if (history.isEmpty()) return
+        r.restore(history.removeAt(history.size - 1))
+        solved = r.isSolved()
+        activeTray = null
+        activeBoard = null
+        drag = null
+        gestureStart = null
+        click()
         invalidate()
     }
 
@@ -816,6 +874,8 @@ class GameView(context: Context) : View(context) {
         activeTray = null
         activeBoard = null
         drag = null
+        history.clear()
+        gestureStart = null
         screen = Screen.PLAY
         invalidate()
     }
@@ -872,9 +932,14 @@ class GameView(context: Context) : View(context) {
         val cell: Int,
         val trayCell: Int,
         val trayRects: List<RectF>,
+        val trayTop: Float,
+        val buttons: List<Pair<String, RectF>>,
     )
 
-    internal fun debugGeometry() = DebugGeometry(boardX, boardY, cellPx, trayCellPx, trayRects.toList())
+    internal fun debugGeometry() = DebugGeometry(
+        boardX, boardY, cellPx, trayCellPx, trayRects.toList(), trayTop,
+        hits.map { it.id to RectF(it.r) },
+    )
 
     internal fun debugRoom(): Room? = room
 
@@ -903,6 +968,6 @@ class GameView(context: Context) : View(context) {
     }
 
     companion object {
-        const val BUILD_STAMP = "Mental Power v1.2.0"
+        const val BUILD_STAMP = "Mental Power v1.3.0"
     }
 }

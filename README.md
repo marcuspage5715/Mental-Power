@@ -25,6 +25,10 @@ leaves a room unwinnable.
 * **Progress that survives closing the app**: the furthest room you have reached.
 * **Colour**: every pentomino has its own soft colour, so a half finished room reads at a glance.
 * **No clock.** Rooms are not timed; nothing is counting at you.
+* **Undo, and no dead ends.** UNDO takes back the last move — a piece placed, moved, turned or
+  put back — so a mistake never costs you the room. Dragging a piece off the board and dropping it
+  on the tray puts it back where it came from, so the board can be cleared piece by piece instead
+  of starting over.
 
 ## How to play
 
@@ -38,7 +42,9 @@ the room.
 | Turn a piece | Tap it in the tray, or tap it once it is on the board |
 | Mirror a piece | **FLIP** in the top bar turns the selected piece over |
 | Turn the selected piece | **ROTATE** in the top bar |
-| Put every piece back | **RESET** |
+| Put every piece back at once | **RESET** (also undoable) |
+| Take back your last move | **UNDO** |
+| Put a piece back in the tray | Drag it off the board and drop it on the tray |
 | Get one piece placed for you | **HINT** (once per room) |
 | Back to the title screen | **MENU**, or the system back button |
 | Leave the app | **EXIT** on the title screen, or back again from there |

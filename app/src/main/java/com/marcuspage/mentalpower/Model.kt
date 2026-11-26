@@ -64,6 +64,9 @@ data class TrayItem(val piece: Int, var variant: Int)
 /** A piece sitting on the board, at grid offset ([ox], [oy]). */
 data class Placement(val piece: Int, val variant: Int, val ox: Int, val oy: Int)
 
+/** The whole state of a room, kept so a move can be taken back. */
+class RoomSnapshot(val placed: List<Placement>, val tray: List<TrayItem>)
+
 /**
  * The live state of one room: which cells have to be filled, which pieces are on the board
  * and which are still in the tray.
@@ -134,6 +137,30 @@ class Room(val level: Levels.Level) {
     fun isSolved(): Boolean {
         for (i in target.indices) if (target[i] && owner[i] < 0) return false
         return true
+    }
+
+    /** The room as it stands, to be handed back to [restore] later. */
+    fun snapshot(): RoomSnapshot =
+        RoomSnapshot(placed.toList(), tray.map { TrayItem(it.piece, it.variant) })
+
+    /** Puts the room back exactly as it was when [snapshot] was taken. */
+    fun restore(snapshot: RoomSnapshot) {
+        for (i in owner.indices) owner[i] = -1
+        placed.clear()
+        for (p in snapshot.placed) {
+            val idx = placed.size
+            placed.add(p)
+            for (c in cellsOf(p.piece, p.variant, p.ox, p.oy)) {
+                if (c.x in 0 until w && c.y in 0 until h) owner[c.y * w + c.x] = idx
+            }
+        }
+        tray.clear()
+        for (item in snapshot.tray) tray.add(TrayItem(item.piece, item.variant))
+    }
+
+    /** Keeps the tray in the order the room handed its pieces out. */
+    fun sortTray() {
+        tray.sortBy { item -> level.pieces.indexOf(item.piece) }
     }
 
     fun reset() {

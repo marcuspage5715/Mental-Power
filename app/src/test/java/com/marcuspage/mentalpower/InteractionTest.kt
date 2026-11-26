@@ -6,7 +6,9 @@ import android.graphics.Canvas
 import android.view.MotionEvent
 import android.view.View
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +37,20 @@ class InteractionTest {
         v.layout(0, 0, width, height)
         v.draw(Canvas(Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)))
         return v
+    }
+
+    private fun redraw(v: GameView) {
+        v.draw(Canvas(Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)))
+    }
+
+    private fun tapButton(v: GameView, id: String) {
+        redraw(v)
+        val hit = v.debugGeometry().buttons.firstOrNull { it.first == id }
+        assertNotNull("no $id button on screen", hit)
+        val x = hit!!.second.centerX()
+        val y = hit.second.centerY()
+        touch(v, MotionEvent.ACTION_DOWN, x, y)
+        touch(v, MotionEvent.ACTION_UP, x, y)
     }
 
     private fun touch(v: View, action: Int, x: Float, y: Float) {
@@ -159,5 +175,83 @@ class InteractionTest {
 
         assertTrue(room.placed.size == 1)
         assertEquals(p.ox + 2, room.placed[0].ox)
+    }
+
+    @Test
+    fun aPieceCanBeDraggedBackIntoTheTray() {
+        val v = view()
+        val geo = v.debugGeometry()
+        val room = v.debugRoom()!!
+        val trayCount = room.tray.size
+
+        val start = geo.trayRects[0]
+        touch(v, MotionEvent.ACTION_DOWN, start.left + geo.trayCell / 2f, start.top + geo.trayCell / 2f)
+        touch(v, MotionEvent.ACTION_MOVE, geo.boardX + geo.cell * 0.1f, geo.boardY + geo.cell * 0.1f)
+        touch(v, MotionEvent.ACTION_UP, geo.boardX + geo.cell * 0.1f, geo.boardY + geo.cell * 0.1f)
+        assertEquals(1, room.placed.size)
+
+        // drag it off the board and drop it on the tray
+        redraw(v)
+        val after = v.debugGeometry()
+        val p = room.placed[0]
+        val fromX = after.boardX + p.ox * after.cell + 2f
+        val fromY = after.boardY + p.oy * after.cell + 2f
+        val toX = 1920f / 2f
+        val toY = after.trayTop + 60f
+        touch(v, MotionEvent.ACTION_DOWN, fromX, fromY)
+        touch(v, MotionEvent.ACTION_MOVE, toX, toY)
+        touch(v, MotionEvent.ACTION_UP, toX, toY)
+
+        assertEquals("the piece should be back in the tray", 0, room.placed.size)
+        assertEquals(trayCount, room.tray.size)
+        assertTrue("the piece should be back in the tray", room.tray.any { it.piece == p.piece })
+    }
+
+    @Test
+    fun undoTakesBackAPlacedPiece() {
+        val v = view()
+        val geo = v.debugGeometry()
+        val room = v.debugRoom()!!
+        val start = geo.trayRects[0]
+        touch(v, MotionEvent.ACTION_DOWN, start.left + geo.trayCell / 2f, start.top + geo.trayCell / 2f)
+        touch(v, MotionEvent.ACTION_MOVE, geo.boardX + geo.cell * 0.1f, geo.boardY + geo.cell * 0.1f)
+        touch(v, MotionEvent.ACTION_UP, geo.boardX + geo.cell * 0.1f, geo.boardY + geo.cell * 0.1f)
+        assertEquals(1, room.placed.size)
+
+        tapButton(v, "undo")
+
+        assertEquals(0, room.placed.size)
+        assertEquals(Levels.LEVELS[0].pieces.size, room.tray.size)
+    }
+
+    @Test
+    fun undoTakesBackAPiecePutBackInTheTray() {
+        val v = view()
+        val geo = v.debugGeometry()
+        val room = v.debugRoom()!!
+        val start = geo.trayRects[0]
+        touch(v, MotionEvent.ACTION_DOWN, start.left + geo.trayCell / 2f, start.top + geo.trayCell / 2f)
+        touch(v, MotionEvent.ACTION_MOVE, geo.boardX + geo.cell * 0.1f, geo.boardY + geo.cell * 0.1f)
+        touch(v, MotionEvent.ACTION_UP, geo.boardX + geo.cell * 0.1f, geo.boardY + geo.cell * 0.1f)
+
+        redraw(v)
+        val after = v.debugGeometry()
+        val p = room.placed[0]
+        touch(v, MotionEvent.ACTION_DOWN, after.boardX + p.ox * after.cell + 2f, after.boardY + p.oy * after.cell + 2f)
+        touch(v, MotionEvent.ACTION_MOVE, 960f, after.trayTop + 60f)
+        touch(v, MotionEvent.ACTION_UP, 960f, after.trayTop + 60f)
+        assertEquals(0, room.placed.size)
+
+        tapButton(v, "undo")
+
+        assertEquals("undo should put the piece back on the board", 1, room.placed.size)
+        assertEquals(p, room.placed[0])
+    }
+
+    @Test
+    fun undoIsDisabledWithNothingToTakeBack() {
+        val v = view()
+        val undo = v.debugGeometry().buttons.firstOrNull { it.first == "undo" }
+        assertNull("undo must not be offered in a fresh room", undo)
     }
 }
